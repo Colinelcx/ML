@@ -222,6 +222,9 @@ class DecisionTree(Classifier):
     def to_pdf(self,filename,dic_var=None):
         pydot.graph_from_dot_data(self.to_dot(dic_var))[0].write_pdf(filename)
 
+    def to_png(self,filename,dic_var=None):
+        pydot.graph_from_dot_data(self.to_dot(dic_var))[0].write_png(filename)
+
     def print_tree(self,fields=None):
         s=""
         nodes=[self.root]
