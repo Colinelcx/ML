@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from scipy.signal import convolve2d
 from sklearn import linear_model
 
 #######################################
@@ -153,9 +154,9 @@ def learn_weigth(patch, dictionary, alpha="best"):
         Retourne les coefficients obtenus et le patch reconstitué
     """
     if alpha =='best':
-        lasso_model = linear_model.LassoCV(max_iter = 10000)
+        lasso_model = linear_model.LassoCV(max_iter = 50000)
     else:
-        lasso_model = linear_model.Lasso(alpha=alpha, max_iter = 10000)
+        lasso_model = linear_model.Lasso(alpha=alpha, max_iter = 50000)
     Y = patch_to_vect(patch)
     train_i = np.argwhere(Y != -100).ravel()
     test_i  = np.argwhere(Y == -100).ravel()
@@ -206,4 +207,50 @@ def initialize_peel(img, h, step):
     n =  missing_pixels[-1,1] -  missing_pixels[0,1]
     #print(x, y, m, n)
     dic = dictionary_centered(img, x, y, m, n, h, step)
+    return dic
+
+##########################################
+# OUTILS POUR LA RECONNAISSANCE DE BORDS
+##########################################
+
+def rgb2gray(rgb):
+    """ np.array(float**3) -> np.array(float**2)
+        Convertit une image rgb en niveaux de gris
+    """
+    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+
+    return gray
+
+def compute_edges(img,x, y, m, n):
+    """ np.array(float**3), int, int, int, int -> np.array(float**3)
+        Calcul les bordures de l'image :
+        Calcul des dérivées Ix et Iy de l'image puis la valeur du gradient. Seuil cette valeur pour obtenir les contours
+    """
+    img_grey = rgb2gray(to_png(img))
+    Sx = np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
+    Sy = np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
+    Ix = convolve2d(img_grey, Sx, mode='same')
+    Iy = convolve2d(img_grey, Sy, mode='same')
+    Ig = np.sqrt(Ix**2 + Iy**2)
+    Ig[x-1:x+m+2,y-1:y+n+2] = 0
+    Ig = np.where(Ig>0.6,1,0)
+    return Ig
+
+def dictionary_priority(img, x, y, m, n, h):
+    """ np.array(float**3), int, int, int, int, int -> dict(patch)
+        Renvoie le dictionnaire des patchs centrés sur les pixels manquant, avec leur ordre de priorité
+    """
+    edges = compute_edges(img, x, y, m, n)
+    dic = {}
+    for i in range(x, x+m+h, h):
+        for j in range(y, y+n+h, h):
+            patch = get_patch(i, j, h, img)
+            if miss_pixel(patch) and not empty_patch(patch):
+                confidence = int(np.where(patch == -100, 0,1).sum()/2)
+                edges_patch = get_patch(i,j,h,edges)
+                data_term = 1 + edges_patch.sum()
+                #print("confidence=",confidence, "data_term=",data_term)
+                prior = confidence * data_term
+                dic[prior] = [patch, i, j, confidence, data_term]
     return dic
