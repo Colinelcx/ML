@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.signal import convolve2d
 from sklearn import linear_model
+from sklearn.utils.testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
 
 #######################################
 # UTILITAIRES POUR LE PREAMBULE
@@ -165,6 +167,8 @@ def learn_weigth(patch, dictionary, alpha="best"):
     for patch_i in dictionary.values():
         X[:,i] = patch_to_vect(patch_i)
         i = i +1
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
     lasso_model.fit(X[train_i], Y[train_i])
     #if alpha == 'best':
         #print("alpha choosen :", lasso_model.alpha_)
